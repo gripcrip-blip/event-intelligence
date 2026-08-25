@@ -33,6 +33,10 @@ next-env.d.ts
 # prisma
 prisma/migrations/**/migration_lock.toml
 
+# vercel / netlify
+.vercel/
+.netlify/
+
 # IDE
 .idea/
 .vscode/

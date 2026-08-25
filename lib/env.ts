@@ -12,9 +12,21 @@ export type Env = z.infer<typeof envSchema>;
 
 let cached: Env | null = null;
 
+function resolveDatabaseUrl(): string | undefined {
+  return (
+    process.env.DATABASE_URL ||
+    process.env.NETLIFY_DB_URL ||
+    process.env.NETLIFY_DATABASE_URL ||
+    process.env.NETLIFY_DATABASE_URL_UNPOOLED
+  );
+}
+
 export function getEnv(): Env {
   if (!cached) {
-    cached = envSchema.parse(process.env);
+    cached = envSchema.parse({
+      ...process.env,
+      DATABASE_URL: resolveDatabaseUrl(),
+    });
   }
   return cached;
 }

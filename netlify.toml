@@ -1,0 +1,11 @@
+[build]
+  command = "npm run build"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# Next.js is auto-detected (OpenNext adapter).
+# Required env vars in Netlify UI (Site settings → Environment variables):
+#   DATABASE_URL             — Neon/Supabase (not localhost Docker)
+#   PANDASCORE_API_TOKEN     — from local .env
+#   PANDASCORE_API_BASE_URL  — https://api.pandascore.co
