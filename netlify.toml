@@ -4,8 +4,8 @@
 [build.environment]
   NODE_VERSION = "22"
 
-# Next.js is auto-detected (OpenNext adapter).
-# Required env vars in Netlify UI (Site settings → Environment variables):
-#   DATABASE_URL             — Neon/Supabase (not localhost Docker)
-#   PANDASCORE_API_TOKEN     — from local .env
-#   PANDASCORE_API_BASE_URL  — https://api.pandascore.co
+# Do not set publish for Next.js — OpenNext adapter manages it.
+# Env vars (Site settings → Environment variables):
+#   NETLIFY_DB_URL / DATABASE_URL — via @netlify/database on first deploy
+#   PANDASCORE_API_TOKEN
+#   PANDASCORE_API_BASE_URL = https://api.pandascore.co
