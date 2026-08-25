@@ -1,7 +1,9 @@
 // Event Intelligence — MVP schema (sports + esports providers)
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // native = local Windows; rhel = Netlify AWS Lambda
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
