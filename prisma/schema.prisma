@@ -1,0 +1,236 @@
+// Event Intelligence — MVP schema (sports + esports providers)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SportCategory {
+  TEAM
+  INDIVIDUAL
+  COMBAT
+  MOTORSPORT
+  ESPORTS
+}
+
+enum EventStatus {
+  CONFIRMED
+  TENTATIVE
+  POSTPONED
+  RESCHEDULED
+  CANCELLED
+  COMPLETED
+}
+
+enum EventKind {
+  MATCH
+  TOURNAMENT
+  RACE_WEEKEND
+  FIGHT_CARD
+  MULTI_DAY
+  OTHER
+}
+
+enum LicenseTier {
+  FIRST_PARTY_CURATED
+  PROVIDER_DISPLAY_ONLY
+  PROVIDER_REDISTRIBUTABLE
+  UNKNOWN
+}
+
+enum ProviderHealthStatus {
+  HEALTHY
+  DEGRADED
+  DOWN
+}
+
+enum SyncRunStatus {
+  SUCCESS
+  PARTIAL
+  FAILED
+}
+
+enum ParticipantType {
+  TEAM
+  PERSON
+  STABLE
+  OTHER
+}
+
+enum ParticipantRole {
+  HOME
+  AWAY
+  FIGHTER
+  DRIVER
+  FIELD
+  OPPONENT
+}
+
+model Sport {
+  id         String        @id @default(uuid()) @db.Uuid
+  slug       String        @unique
+  name       String
+  category   SportCategory
+  isActive   Boolean       @default(true) @map("is_active")
+  createdAt  DateTime      @default(now()) @map("created_at")
+  updatedAt  DateTime      @updatedAt @map("updated_at")
+
+  events       Event[]
+  competitions Competition[]
+  participants Participant[]
+
+  @@map("sports")
+}
+
+model SourceProvider {
+  id                         String               @id @default(uuid()) @db.Uuid
+  key                        String               @unique
+  name                       String
+  reliabilityScore           Int                  @default(70) @map("reliability_score")
+  commercialDisplayAllowed   Boolean              @default(true) @map("commercial_display_allowed")
+  storageAllowed             Boolean              @default(true) @map("storage_allowed")
+  redistributionAllowed      Boolean              @default(false) @map("redistribution_allowed")
+  attributionRequired        Boolean              @default(true) @map("attribution_required")
+  attributionText            String?              @map("attribution_text")
+  termsUrl                   String?              @map("terms_url")
+  licenseNotes               String?              @map("license_notes")
+  isActive                   Boolean              @default(true) @map("is_active")
+  rateLimitPerMin            Int                  @default(60) @map("rate_limit_per_min")
+  lastSyncAt                 DateTime?            @map("last_sync_at")
+  nextSyncAt                 DateTime?            @map("next_sync_at")
+  lastError                  String?              @map("last_error")
+  healthStatus               ProviderHealthStatus @default(HEALTHY) @map("health_status")
+  createdAt                  DateTime             @default(now()) @map("created_at")
+  updatedAt                  DateTime             @updatedAt @map("updated_at")
+
+  eventSourceLinks EventSourceLink[]
+  syncRuns         ProviderSyncRun[]
+
+  @@map("source_providers")
+}
+
+model Competition {
+  id          String   @id @default(uuid()) @db.Uuid
+  sportId     String   @map("sport_id") @db.Uuid
+  slug        String   @unique
+  name        String
+  shortName   String?  @map("short_name")
+  officialUrl String?  @map("official_url")
+  isRecurring Boolean  @default(true) @map("is_recurring")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  sport  Sport   @relation(fields: [sportId], references: [id])
+  events Event[]
+
+  @@index([sportId])
+  @@map("competitions")
+}
+
+model Event {
+  id                  String      @id @default(uuid()) @db.Uuid
+  canonicalName       String      @map("canonical_name")
+  slug                String      @unique
+  sportId             String      @map("sport_id") @db.Uuid
+  subcategory         String?
+  kind                EventKind   @default(MATCH)
+  competitionId       String?     @map("competition_id") @db.Uuid
+  startDatetime       DateTime    @map("start_datetime") @db.Timestamptz(6)
+  endDatetime         DateTime?   @map("end_datetime") @db.Timestamptz(6)
+  timezone            String      @default("UTC")
+  status              EventStatus @default(TENTATIVE)
+  countryCode         String?     @map("country_code") @db.Char(2)
+  cityName            String?     @map("city_name")
+  venueName           String?     @map("venue_name")
+  officialUrl         String?     @map("official_url")
+  verified            Boolean     @default(false)
+  dataQualityScore    Int         @default(70) @map("data_quality_score")
+  exposeAsConfirmed   Boolean     @default(true) @map("expose_as_confirmed")
+  licenseTier         LicenseTier @default(PROVIDER_DISPLAY_ONLY) @map("license_tier")
+  lastSourceUpdateAt  DateTime?   @map("last_source_update_at") @db.Timestamptz(6)
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
+  deletedAt           DateTime?   @map("deleted_at") @db.Timestamptz(6)
+
+  sport        Sport             @relation(fields: [sportId], references: [id])
+  competition  Competition?      @relation(fields: [competitionId], references: [id])
+  sourceLinks  EventSourceLink[]
+  participants EventParticipant[]
+
+  @@index([startDatetime])
+  @@index([sportId, startDatetime])
+  @@index([status])
+  @@index([dataQualityScore])
+  @@map("events")
+}
+
+model Participant {
+  id               String          @id @default(uuid()) @db.Uuid
+  sportId          String          @map("sport_id") @db.Uuid
+  slug             String
+  name             String
+  normalizedName   String          @map("normalized_name")
+  type             ParticipantType @default(TEAM)
+  externalSourceId String?         @map("external_source_id")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+
+  sport  Sport              @relation(fields: [sportId], references: [id])
+  events EventParticipant[]
+
+  @@unique([sportId, slug])
+  @@index([sportId, normalizedName])
+  @@map("participants")
+}
+
+model EventParticipant {
+  eventId       String          @map("event_id") @db.Uuid
+  participantId String          @map("participant_id") @db.Uuid
+  role          ParticipantRole @default(OPPONENT)
+  sortOrder     Int             @default(0) @map("sort_order")
+
+  event       Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  participant Participant @relation(fields: [participantId], references: [id])
+
+  @@id([eventId, participantId, role])
+  @@map("event_participants")
+}
+
+model EventSourceLink {
+  id               String   @id @default(uuid()) @db.Uuid
+  eventId          String   @map("event_id") @db.Uuid
+  sourceProviderId String   @map("source_provider_id") @db.Uuid
+  sourceEventId    String   @map("source_event_id")
+  sourceUrl        String?  @map("source_url")
+  rawPayloadHash   String?  @map("raw_payload_hash")
+  lastSeenAt       DateTime @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  matchConfidence  Decimal  @default(1) @map("match_confidence") @db.Decimal(4, 3)
+
+  event          Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  sourceProvider SourceProvider @relation(fields: [sourceProviderId], references: [id])
+
+  @@unique([sourceProviderId, sourceEventId])
+  @@index([eventId])
+  @@map("event_source_links")
+}
+
+model ProviderSyncRun {
+  id               String        @id @default(uuid()) @db.Uuid
+  sourceProviderId String        @map("source_provider_id") @db.Uuid
+  startedAt        DateTime      @default(now()) @map("started_at") @db.Timestamptz(6)
+  finishedAt       DateTime?     @map("finished_at") @db.Timestamptz(6)
+  status           SyncRunStatus @default(SUCCESS)
+  fetchedCount     Int           @default(0) @map("fetched_count")
+  upsertedCount    Int           @default(0) @map("upserted_count")
+  errorCount       Int           @default(0) @map("error_count")
+  meta             Json?
+
+  sourceProvider SourceProvider @relation(fields: [sourceProviderId], references: [id])
+
+  @@index([sourceProviderId, startedAt(sort: Desc)])
+  @@map("provider_sync_runs")
+}
